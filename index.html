@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Type-level Talk</title>
+  <meta name="description" content="">
+  <meta name="author" content="Zhenhao Li">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootswatch/2.3.1/amelia/bootstrap.min.css">
+<link rel="stylesheet" href="./frameworks/revealjs/css/reveal.min.css">
+  <link rel="stylesheet" href="./frameworks/revealjs/css/theme/sky.css" id="theme">
+  <link rel="stylesheet" href="./highlighters/highlight.js/css/atom-one-dark.css" id="theme">
+  <!--[if lt IE 9]>
+  <script src="lib/js/html5shiv.js"></script>
+  <![endif]-->  <link rel="stylesheet" href = "assets/css/slidify-reveal.css">
+
+</head>
+<body>
+  
+  <div class="reveal">
+    <div class="slides">
+      <section class='' data-state='' id='slide-1'>
+  <h2>The Power of Type Classes in Big Data ETL</h2>
+  <h3>A Use Case of Combining Spark and Shapeless</h3>
+
+<p><a href="https://www.linkedin.com/in/zhenhaoli/">Zhenhao Li</a>
+<a href="http://www.connecterra.io/"><div><img width = '480px'   src='connecterra_black-01.png'></div></a> </p>
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+
+  <aside class='notes'>
+    <p>This is the title page.</p>
+
+  </aside>
+</section>
+<section class='' data-state='' id='slide-2'>
+  <h3>About Me</h3>
+  <p><section></p>
+
+</section>
+<section class='' data-state='' id='slide-3'>
+  
+  <p>Data scientist and engineer at Connecterra since Feb 2017</p>
+
+</section>
+<section class='' data-state='' id='slide-4'>
+  
+  <p>1.5 year in consulting at Accenture</p>
+
+</section>
+<section class='' data-state='' id='slide-5'>
+  
+  <p>M.Sc. in logic and PhD-in-progress in mathematical logic </p>
+
+</section>
+<section class='' data-state='' id='slide-6'>
+  
+  <p>B.Eng. in Software Engineer from China </p>
+
+</section>
+<section class='' data-state='' id='slide-7'>
+  
+  <p>Two years experience with Scala</p>
+
+</section>
+<section class='' data-state='' id='slide-8'>
+  
+  <p>Learned about Shapeless in Dec 2016</p>
+
+<p></section></p>
+
+</section>
+<section>
+   <section class='' data-state=''>
+    <h2>Big data <small>@</small> <a href="http://www.connecterra.io/"><img width = '460px'  src='connecterra_black-01.png'></a></h2>
+    <ul class = "build incremental">
+<li>Our business is built on data and models</li>
+<li>Each data science project has an ETL component<br></li>
+<li>We need flexible and extendable library for ETL</li>
+</ul>
+
+    <aside class='notes'>
+      <p>The boundary between ETL and feature engineering is blurred</p>
+
+    </aside>
+   </section>
+</section>
+<section>
+   <section class='' data-state=''>
+    <h2>Why Spark</h2>
+    <ul class = "build incremental">
+<li>Powerful API to write distributive algorithms </li>
+<li>Support for map-side reduce (RDD API only)</li>
+<li>Good performance</li>
+</ul>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Performance Comparison</h3>
+
+<p><img src="assets/fig/unnamed-chunk-1-1.png" alt="plot of chunk unnamed-chunk-1"></p>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+</section>
+<section>
+   <section class='' data-state=''>
+    <h2>Why type level programming</h2>
+    <ul class = "build incremental">
+<li>Let the compiler help reduce programming errors</li>
+<li>We want our code to be composable and reusable<br></li>
+<li>Libraries should be open to user-extensions</li>
+</ul>
+
+    <aside class='notes'>
+      <p>We are asked to produce aggregations for each type of activity. 
+For &quot;walking&quot; we only care about the total duration of each user;
+for &quot;sitting&quot; we want the total duration and the total event count of each user. </p>
+
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <p>The task</p>
+
+<pre><code class="scala">case class Event(userID: Int, activityType: String, 
+                timeStamp: Long, duration: Long)
+
+val rawEvents: RDD[Event] = ???
+
+def processSittingEvents(sittingEvents: RDD[Event]) = ???
+
+def processWalkingEvents(walking: RDD[Event]) = ???
+
+val sittingResult = 
+    processSittingEvents(rawEvents.filter(_.activityType == &quot;sitting&quot;))
+
+val walkingResult = 
+    processWalkingEvents(rawEvents.filter(_.activityType == &quot;walking&quot;))
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <p>Would be nice if we could write</p>
+
+<pre><code class="scala">
+case class Event(userID: Int, activityType: String, 
+                timeStamp: Long, duration: Long)
+
+val rawEvents: RDD[Event] = ???
+
+def processEvents[T](rawEvents: RDD[Event]) = ???
+
+val sittingResult = processEvents[Sitting](rawEvents)
+
+val walkingResult = processEvents[Walking](rawEvents)
+
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+</section>
+<section>
+   <section class='' data-state=''>
+    <h3>Singleton types</h3>
+    <pre><code class="scala">import shapeless.syntax.singleton._
+
+val sittingWit = &quot;sitting&quot;.witness
+type Sitting = sittingWit.T
+
+val walkingWit = &quot;walking&quot;.witness
+type Walking = walkingWit.T
+</code></pre>
+
+    <aside class='notes'>
+      <p>A type is a set(collection) of values.
+A singleton type is a type containing only one value. 
+Hence the value is inferred from the type. </p>
+
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Type classes</h3>
+
+<pre><code class="scala">trait Aggregator[T]{
+    type Result
+    type Representation
+    def name: String
+    def extract(rawEvents: RDD[Event]): RDD[Representation]
+    def aggregate(internalReprRDD: RDD[Representation]): Result
+    def process: RDD[Event] =&gt; Result = aggregate _ compose extract
+}
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Type classes</h3>
+
+<pre><code class="scala">object Aggregator{
+    implicit def basicActivityAggregator[A &lt;: String]
+        (implicit wtA: Witness.Aux[A]): Aggregator[A] = new Aggregator[A]{
+            type Result = RDD[(Int, Double)] //userID and total duration
+            type Representation = (Int, Double)
+            def name = wtA.value
+            def extract(rawEvents: RDD[Event]) =
+                rawEvents
+                  .filter(_.activityType == name)
+                  .map(e =&gt; (e.userID, e.duration))
+            def aggregate(internalReprRDD: RDD[Representation]) =
+                internalReprRDD
+                  .aggregateByKey(0.0)(_ + _, _ + _)
+    }
+}
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Type classes</h3>
+
+<pre><code class="scala">object AggregatorsWithCounts {
+    import shapeless._
+    def basicActivityAggregatorWithCounts[A &lt;: String]
+    (implicit wtA: Witness.Aux[A]): Aggregator[A] = new Aggregator[A]{
+        type Result = RDD[(Int, (Double, Int))] //userID and total duration
+        type Representation = (Int, (Double, Int))
+        def name = wtA.value
+        def extract(rawEvents: RDD[Event]) =
+            rawEvents
+              .filter(_.activityType == name)
+              .map(e =&gt; (e.userID, (e.duration, 1)))
+        val monoid = implicitly[Monoid[(Double, Int)]]
+        import MonoidSyntax._
+        def aggregate(internalReprRDD: RDD[Representation]) =
+            internalReprRDD
+              .aggregateByKey(monoid.zero)(_ |+| _, _ |+| _)
+    }
+
+}
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Type classes</h3>
+
+<pre><code class="scala">def processEvents[T](rawEvents: RDD[Event])
+    (implicit aggregator: Aggregator[T]): aggregator.Result
+        = aggregator.process(rawEvents)
+
+val rawEvents: RDD[Event] = ???
+
+implicit val sittingAggregator: Aggregator[Sitting] 
+            = AggregatorsWithCounts.basicActivityAggregatorWithCounts[Sitting]
+val sittingResult2 = processEvents[Sitting](rawEvents)
+val walkingResult2 = processEvents[Walking](rawEvents)
+</code></pre>
+
+<p><small><a href="https://gist.github.com/Zhen-hao/26edb91668c286eed7a2864912a59c35">Full tutorial link</a></small></p>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+</section>
+<section>
+   <section class='' data-state=''>
+    <h3>What we achieved in our ETL library</h3>
+    <pre><code class="scala">implicit val rawRDD: RDD[Event] = ???
+val intctRDD = implicitly[IntercectionActivityRDD]
+
+val sittingEatingResult: RDD[(Key, SimpleAggregation)]
+    = intctRDD.intercectionAggregation[Key, Sitting, Eating]
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Under the hood</h3>
+
+<pre><code class="scala">trait ActivityIntercectionMonoid[A &lt;: String, B&lt;: String] 
+    extends Monoid[ActivityIntercection[A, B]] {
+    implicit def orderingA: Ordering[ActivityWithType[A]]
+    implicit def orderingB: Ordering[ActivityWithType[B]]
+    implicit def orderingCombin: Ordering[CombinedActivity[A, B]]
+}
+
+object ActivityIntercectionMonoid{
+    implicit def getActIntMonoid[A &lt;: String, B&lt;: String]
+        (implicit wtA: Witness.Aux[A], wtB: Witness.Aux[B])
+        = new ActivityIntercectionMonoid[A,B]{
+            ???
+        }
+}
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Under the hood</h3>
+
+<pre><code class="scala">trait KeyedActivityRDD[K, A] extends Serializable{
+    implicit val keyedRDD: RDD[(K, A)]
+    def aggregation[S](implicit classTagS: ClassTag[S], 
+        lift: A =&gt; S, monoid: Monoid[S]): RDD[(K,S)]
+}
+object KeyedActivityRDD{
+    implicit def apply[K, A](implicit classTagK: ClassTag[K], 
+        classTagA: ClassTag[A], rdd: RDD[(K, A)])
+        : KeyedActivityRDD[K,A] = new KeyedActivityRDD[K,A]{
+        implicit val keyedRDD = rdd
+        implicit def aggregation[S](implicit classTagS: ClassTag[S], 
+        lift: A =&gt; S, monoid: Monoid[S]): RDD[(K,S)] ={
+            import MonoidSyntax._
+            keyedRDD.mapValues(lift)
+                    .aggregateByKey(monoid.zero)(_ |+| _, _ |+| _)
+        }
+    }
+}
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>So we can do</h3>
+
+<pre><code class="scala">case class SittingAggregation(totalDuration: Double, eventCount: Int)
+
+implicit rawData: RDD[(K,A)] = ???
+val result = implicitly[ActivityIntercectionMonoid[K,A]]
+                .aggregation[SittingAggregation]
+</code></pre>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+</section>
+<section>
+   <section class='' data-state=''>
+    <h1>Conclusions</h1>
+    
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Pros</h3>
+
+<ul class = "build incremental">
+<li>Typelevel programming enables the compiler to catch programming errors<br></li>
+<li>Can help build a higher level API or DSL<br></li>
+<li>Separate how from what</li>
+<li>Compostable abstractions</li>
+</ul>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h3>Cons</h3>
+
+<ul class = "build incremental">
+<li>Users need to appreciate types and compiling errors</li>
+<li>Users must understand how implicits work</li>
+<li>Danger of ambiguity errors when multiple processes exist sharing input or output data types.</li>
+</ul>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+   <section class='' data-state=''>
+    <h2>Thank you!</h2>
+
+<p><a href="#/2" class="image">
+  <img src="cph.jpg">
+</a></p>
+
+    <aside class='notes'>
+      
+    </aside>
+   </section>
+</section>
+    </div>
+  </div>
+</body>
+  <script src="./frameworks/revealjs/lib/js/head.min.js"></script>
+  <script src="./frameworks/revealjs/js/reveal.min.js"></script>
+  <script>
+  // Full list of configuration options available here:
+  // https://github.com/hakimel/reveal.js#configuration
+  Reveal.initialize({
+    controls: true,
+    progress: true,
+    history: true,
+    center: true,
+    theme: Reveal.getQueryHash().theme || 'sky', 
+    transition: Reveal.getQueryHash().transition || 'concave', 
+    dependencies: [
+    // Cross-browser shim that fully implements classList -
+    // https://github.com/eligrey/classList.js/
+      { src: './frameworks/revealjs/lib/js/classList.js', condition: function() { return !document.body.classList;}},
+      // Zoom in and out with Alt+click
+      { src: './frameworks/revealjs/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+      // Speaker notes
+      { src: './frameworks/revealjs/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+      // Remote control your reveal.js presentation using a touch device
+      //{ src: './frameworks/revealjs/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+      ]
+  });
+  </script>  <!-- LOAD HIGHLIGHTER JS FILES -->
+<script src="./highlighters/highlight.js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<!-- DONE LOADING HIGHLIGHTER JS FILES -->
+ 
+
+</html>
